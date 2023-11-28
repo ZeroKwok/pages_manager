@@ -55,6 +55,7 @@ class AbstractPage : public QWidget
     Q_PROPERTY(QString name READ name)
 
     friend class PagesContainer;
+    friend class PagesManager;
 public:
     AbstractPage(PagesContainer* container = nullptr);
     virtual ~AbstractPage() {}
@@ -93,8 +94,9 @@ public:
 
 protected:
     QString m_name;
+    QVariantMap m_lastParams;           //!< 最近的页面入参
     PagesContainer* m_parent;           //!< 父容器
-    QSet<PagesContainer*> m_containers;       //!< 已安装的容器实例
+    QSet<PagesContainer*> m_containers; //!< 已安装的容器实例
 };
 
 
@@ -270,6 +272,7 @@ public:
             page->pageRaises();
         }
         m_currentPage = page;
+        m_currentPage->m_lastParams = params;
         emit currentPageChanged(callerPagePath, calleePagePath);
     }
 
