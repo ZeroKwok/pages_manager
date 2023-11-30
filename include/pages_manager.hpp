@@ -75,7 +75,19 @@ public:
     //! 会在pageEnter(), pageInvoke(), pageRaises()之前被调用, 并保证每个页面实例仅调用一次.
     virtual void pageLazyInit() {};
     virtual void pageRaises();
-    virtual void pageEnter(QString lastPath, const QVariantMap& params) {};
+
+    //! pageShow(), pageEnter() 两者之前的区别是:
+    //!   1. pageShow() 会在页面切换过程中被调用, 以便页面有机会渲染自己.
+    //!   2. pageEnter() 只有在目标页面被激活 且 params参数有效, 才会被调用.
+
+    virtual void pageShow() {};
+
+    //! 注意:
+    //! 参数 params 是非常量修饰, 而在pageEnter() 调用期间, m_lastParams仍然是上一次的状态.
+    //! 这意味着你可以从 m_lastParams 拷贝一些信息保存在 params 里面.
+    //! pageEnter()返回后, 页面管理器才将会将 params 覆盖到 m_lastParams.
+    //! 
+    virtual void pageEnter(QString lastPath, QVariantMap& params) {};
     virtual QVariant pageInvoke(QString callerPath, const QVariantMap& params) {
         Q_ASSERT_X(0, "AbstractPage", "This method is not implemented yet");
         return {};
@@ -267,12 +279,18 @@ public:
             auto path = page->pagePath();
             if (params.contains(path))
                 page->pageEnter(callerPagePath, params.value(path).value<QVariantMap>());
-            else
-                page->pageEnter(callerPagePath, params);
+
+            page->pageShow();
             page->pageRaises();
         }
+
+        if (!params.isEmpty()) {
+            auto duplicate = params;
+            page->pageEnter(callerPagePath, duplicate);
+            page->m_lastParams = duplicate;
+        }
+
         m_currentPage = page;
-        m_currentPage->m_lastParams = params;
         emit currentPageChanged(callerPagePath, calleePagePath);
     }
 

@@ -44,7 +44,7 @@ public:
         hbox->addWidget(widget);
     }
 
-    void pageEnter(QString lastPath, const QVariantMap& params) {
+    void pageEnter(QString lastPath, QVariantMap& params) {
         
     }
 
