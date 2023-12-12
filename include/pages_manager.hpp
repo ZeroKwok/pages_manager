@@ -71,6 +71,11 @@ public:
         return "/" + hops.join('/');
     }
 
+    PagesContainer* parent() const { return m_parent; }
+    QSet<PagesContainer*> containers() const { return m_containers; }
+
+    QVariantMap& lastParams() { return m_lastParams; }
+
     //! 惰性初始化事件
     //! 会在pageEnter(), pageInvoke(), pageRaises()之前被调用, 并保证每个页面实例仅调用一次.
     virtual void pageLazyInit() {};
@@ -103,6 +108,7 @@ public:
 
     AbstractPage* subpage(QString name) const;
     AbstractPage* parentPage() const;
+
 
 protected:
     QString m_name;
@@ -233,7 +239,9 @@ public:
             else
                 page = page->subpage(n);
 
-            Q_ASSERT(page);
+            if (page == nullptr)
+                return nullptr;
+
             if (!page->property("initialized").toBool()) {
                 page->pageLazyInit();
                 page->setProperty("initialized", true);
@@ -241,6 +249,15 @@ public:
         }
 
         return page;
+    }
+
+    QSet<PagesContainer*> containers(QString path) const {
+        Q_ASSERT(m_root);
+        if (path == "/")
+            return { m_root };
+        if (auto p = page(path))
+            return p->m_containers;
+        return {};
     }
 
     bool canForward() const {
