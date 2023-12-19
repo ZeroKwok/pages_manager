@@ -74,6 +74,7 @@ public:
     PagesContainer* parent() const { return m_parent; }
     QSet<PagesContainer*> containers() const { return m_containers; }
 
+    QVariant&    lastParam(const QString& key) { return m_lastParams[key]; }
     QVariantMap& lastParams() { return m_lastParams; }
 
     //! 惰性初始化事件
