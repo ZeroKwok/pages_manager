@@ -26,7 +26,7 @@ option(PAGES_MANAGER_BUILD_EXAMPLE "Compile the example" ON)
 add_library(${PROJECT_NAME} INTERFACE)
 target_include_directories(${PROJECT_NAME} INTERFACE 
     ${CMAKE_CURRENT_SOURCE_DIR}/include)
-set(PAGES_MANAGER_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
+set(PAGES_MANAGER_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include PARENT_SCOPE)
 
 if(PAGES_MANAGER_BUILD_EXAMPLE)
     add_subdirectory(examples)

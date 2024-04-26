@@ -32,6 +32,10 @@ set(CMAKE_AUTOUIC ON)
 
 find_package(Qt5 REQUIRED Widgets Core)
 
+if (NOT PAGES_MANAGER_INCLUDE_DIR)
+    set(PAGES_MANAGER_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+endif()
+
 # 注意:
 # pages_manager.hpp 需要生成MOC文件, 因此需要显示生成一下
 qt5_wrap_cpp(QtMocFiles ${PAGES_MANAGER_INCLUDE_DIR}/pages_manager.hpp)
