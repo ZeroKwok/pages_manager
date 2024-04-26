@@ -84,10 +84,10 @@ public:
     //!          2. pageEnter() 只有在目标页面被激活 且 params 参数有效, 才会被调用.
     virtual void pageShow() {};
 
-    //! @brief 页面进入事件 (页面被激活时, 被PagesManager调用)
+    //! @brief 页面数据进入事件 (带参数跳转到目标页面时, 被PagesManager调用)
     //! @param lastPath 上一个页面的路径
     //! @param params 页面参数，这个参数将在 pageEnter() 返回之后存储到 m_lastParams。
-    //! @note  pageEnter() 事件中页面期望: 将 params 中存储的状态, 同步到界面上。
+    //! @note  pageEnter() 事件中页面期望: 在必要时预处理 params 中的数据。
     //! @note  pageShow(), pageEnter() 两者之前的区别是:
     //!          1. pageShow() 会在页面切换过程中被调用, 以便页面有机会刷新自己.
     //!          2. pageEnter() 只有在目标页面被激活 且 params 参数有效, 才会被调用.
@@ -152,17 +152,7 @@ public:
     PagesContainer(QWidget* parent = nullptr) 
         : QStackedWidget(parent)
         , m_parentPage(nullptr)
-    {
-        //connect(this, &QStackedWidget::currentChanged, this, 
-        //    [=](int index) {
-        //        if (auto page = static_cast<AbstractPage*>(QStackedWidget::widget(index))) {
-        //            if (!page->property("initialized").toBool()) {
-        //                page->pageLazyInit();
-        //                page->setProperty("initialized", true);
-        //            }
-        //        }
-        //    });
-    }
+    {}
 
     virtual ~PagesContainer() {}
 
@@ -318,6 +308,11 @@ public:
         Q_ASSERT(m_root);
         Q_ASSERT(!calleePagePath.contains("\\"));
 
+        auto callPageEnter = [](auto & page, auto const& path, auto params) {
+            page->pageEnter(path, params);
+            page->m_lastParams = params;
+        };
+
         callerPagePath = callerPagePath.toLower();
         calleePagePath = calleePagePath.toLower();
 
@@ -339,17 +334,13 @@ public:
             }
 
             auto path = page->pagePath();
-            if (params.contains(path))
-                page->pageEnter(callerPagePath, params.value(path).value<QVariantMap>());
+            if (params.contains(path)) 
+                callPageEnter(page, callerPagePath, params.value(path).value<QVariantMap>());
+            else if (!params.isEmpty() && hops.last() == n)
+                callPageEnter(page, callerPagePath, params);
 
             page->pageShow();
             page->pageRaises();
-        }
-
-        if (!params.isEmpty()) {
-            auto duplicate = params;
-            page->pageEnter(callerPagePath, duplicate);
-            page->m_lastParams = duplicate;
         }
 
         m_currentPage = page;
@@ -397,7 +388,7 @@ public:
     }
 
 public:
-    //! @brief 当前以任何方式导致页面改变时, 被发射。
+    //! @brief 当前以任何方式切换当前页面时, 将发射此信号。
     Q_SIGNAL void currentPageChanged(QString oldPagePath, QString newPagePath);
 
 protected:
