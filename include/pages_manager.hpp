@@ -293,6 +293,10 @@ public:
         return {};
     }
 
+    QStack<QString>& stackBack() { return m_stackBack; }
+
+    QStack<QString>& stackForward() { return m_stackForward; }
+
     bool canForward() const {
         return !m_stackForward.isEmpty();
     }
