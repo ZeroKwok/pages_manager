@@ -54,15 +54,11 @@ public:
         // 生成短码: 首字母 + 末字母
         QString code = generateBaseCode(pageName_lower);
         
-        // 处理重复: 如果短码已被使用, 尝试生成新的
-        int attempt = 0;
-        while (m_codeToName.contains(code) && attempt < 26) {
-            code = generateAlternativeCode(pageName_lower, attempt++);
+        // 处理重复: 如果短码已被使用, 尝试生成新的, 如果不能解决冲突, 则崩溃
+        if (m_codeToName.contains(code) && !generateAlternativeCode(code, pageName_lower)) {
+            abort(); // 崩溃, 确保不会发生重复
         }
-        
-        Q_ASSERT_X(!m_codeToName.contains(code), "ShortcodeAllocator", 
-                   QString("Short code collision: %1").arg(code).toStdString().c_str());
-        
+
         m_nameToCode[pageName_lower] = code;
         m_codeToName[code] = pageName_lower;
         
@@ -138,28 +134,48 @@ private:
 
     //! @brief 生成替代短码 (冲突时使用)
     //! @note 首先尝试名字中的字符组合, 不足时使用任意字符尝试
-    QString generateAlternativeCode(const QString& name, int attempt) const {
-        if (name.isEmpty())
-            return {};
-        
-        // 第一阶段: 尝试 name[0] + name[i] 的组合
-        int nameLen = name.length();
-        int nameAttempts = nameLen > 1 ? nameLen - 1 : nameLen;
-        
-        if (attempt < nameAttempts) {
-            return QString(name[0]) + QString(name[attempt + 1]);
+    bool generateAlternativeCode(QString& code, const QString& name) const {
+
+        // 第一阶段：从 name 中提取组合
+        if (!name.isEmpty()) {
+            for (int i = 1; i < name.size(); ++i) {
+                if (!m_codeToName.contains(QString(name[0]) + name[i])) {
+                    code = QString(name[0]) + name[i];
+                    return true;
+                }
+            }
         }
-        
-        // 第二阶段: 名字组合都用完了, 使用任意字符尝试
-        // 使用 a-z 字符的所有两字符组合
-        int adjustedAttempt = attempt - nameAttempts;
-        const QString chars = "abcdefghijklmnopqrstuvwxyz";
-        int charsCount = chars.length();
-        
-        int pos1 = (adjustedAttempt / charsCount) % charsCount;
-        int pos2 = adjustedAttempt % charsCount;
-        
-        return QString(chars[pos1]) + QString(chars[pos2]);
+
+        const QString chars =
+            "abcdefghijklmnopqrstuvwxyz"
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "0123456789";
+
+        auto test = [&](QString c1) -> bool {
+            for (QChar c2 : chars) {
+                if (!m_codeToName.contains(c1 + c2)) {
+                    code = c1 + c2;
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        // 如果 name 只有一个字符
+        if (name.size() == 1) {
+            if (test(name[0])) 
+                return true;
+        }
+
+        // 第二阶段：遍历所有 chars 两字符组合
+        for (QChar c1 : chars) {
+            if (c1 != name[0]) {
+                if (test(c1))
+                    return true;
+            }
+        }
+
+        return false;
     }
 
 private:
