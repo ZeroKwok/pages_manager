@@ -20,7 +20,7 @@
 
 cmake_minimum_required(VERSION 3.10)
 
-project(pages_manager VERSION 0.1.2)
+project(pages_manager VERSION 0.2.1)
 option(PAGES_MANAGER_BUILD_EXAMPLE "Compile the example" ON)
 
 add_library(${PROJECT_NAME} INTERFACE)
