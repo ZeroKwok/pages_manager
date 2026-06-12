@@ -39,7 +39,10 @@ public:
     }
 
     void pageLazyInit() override {
-        _label->setText(pagePath());
+        _label->setText(
+            QString("Path: %1\nCode: %2")
+                .arg(pagePath())
+                .arg(PagesManager::instance().toShortcodePath(pagePath())));
     }
 
     void setupWidget(QWidget* widget) {
@@ -150,6 +153,7 @@ int main(int argc, char* argv[])
     root->installPage("home", new MyPage());
     root->installPage("view", new MyPage());
     root->installPage("perform", new MyPage());
+    root->setMinimumSize(400, 300);
 
     //////////////////////////////////////////////////////////////////////////
     auto pageCast = [](QString p) {

@@ -29,6 +29,144 @@
 #include <QStackedWidget>
 #include <QApplication>
 
+//! @brief 短码分配器(单例)
+//! @note 为页面名称分配全局唯一的两字符短码
+class ShortcodeAllocator
+{
+public:
+    static ShortcodeAllocator& instance() {
+        static ShortcodeAllocator* __imp = nullptr;
+        if (__imp == nullptr)
+            __imp = new ShortcodeAllocator();
+        return *__imp;
+    }
+
+    //! @brief 为页面名称分配或获取短码
+    //! @param pageName 页面名称
+    //! @return 分配的短码 (2字符)
+    QString allocate(const QString& pageName) {
+        QString pageName_lower = pageName.toLower();
+        
+        // 如果已经分配过, 直接返回
+        if (m_nameToCode.contains(pageName_lower))
+            return m_nameToCode[pageName_lower];
+        
+        // 生成短码: 首字母 + 末字母
+        QString code = generateBaseCode(pageName_lower);
+        
+        // 处理重复: 如果短码已被使用, 尝试生成新的
+        int attempt = 0;
+        while (m_codeToName.contains(code) && attempt < 26) {
+            code = generateAlternativeCode(pageName_lower, attempt++);
+        }
+        
+        Q_ASSERT_X(!m_codeToName.contains(code), "ShortcodeAllocator", 
+                   QString("Short code collision: %1").arg(code).toStdString().c_str());
+        
+        m_nameToCode[pageName_lower] = code;
+        m_codeToName[code] = pageName_lower;
+        
+        return code;
+    }
+
+    //! @brief 根据名称获取页面短码
+    //! @param pageName 页面名称
+    //! @return 页面短码, 不存在时返回空字符串
+    QString pageCode(const QString& pageName) const {
+        QString pageName_lower = pageName.toLower();
+        if (m_nameToCode.contains(pageName_lower))
+            return m_nameToCode[pageName_lower];
+        return {};
+    }
+
+    //! @brief 根据短码获取页面名称
+    //! @param code 短码
+    //! @return 页面名称, 不存在时返回空字符串
+    QString pageName(const QString& code) const {
+        QString codeLower = code.toLower();
+        if (m_codeToName.contains(codeLower))
+            return m_codeToName[codeLower];
+        return {};
+    }
+
+    //! @brief 清空所有分配记录
+    void clear() {
+        m_nameToCode.clear();
+        m_codeToName.clear();
+    }
+
+    //! @brief 强制分配或验证短码
+    //! @param pageName 页面名称
+    //! @param customCode 指定的短码(可选), 如果为空则自动分配
+    //! @return 分配的短码, 冲突返回空字符串
+    QString assignShortcode(const QString& pageName, const QString& customCode = {}) {
+        QString pageName_lower = pageName.toLower();
+        
+        // 如果已经分配过, 直接返回
+        if (m_nameToCode.contains(pageName_lower))
+            return m_nameToCode[pageName_lower];
+        
+        QString code = customCode.isEmpty() ? QString() : customCode.toLower();
+        
+        // 如果指定了短码，验证冲突
+        if (!code.isEmpty()) {
+            if (m_codeToName.contains(code))
+                return {};  // 冲突
+        }
+        else {
+            // 自动分配
+            code = allocate(pageName);
+            return code;
+        }
+        
+        // 使用指定的短码
+        m_nameToCode[pageName_lower] = code;
+        m_codeToName[code] = pageName_lower;
+        
+        return code;
+    }
+
+private:
+    ShortcodeAllocator() {}
+
+    //! @brief 生成基础短码: 首字母 + 末字母
+    QString generateBaseCode(const QString& name) const {
+        if (name.length() < 2)
+            return name.length() == 1 ? name + name : "";
+        return QString(name[0]) + QString(name[name.length() - 1]);
+    }
+
+    //! @brief 生成替代短码 (冲突时使用)
+    //! @note 首先尝试名字中的字符组合, 不足时使用任意字符尝试
+    QString generateAlternativeCode(const QString& name, int attempt) const {
+        if (name.isEmpty())
+            return {};
+        
+        // 第一阶段: 尝试 name[0] + name[i] 的组合
+        int nameLen = name.length();
+        int nameAttempts = nameLen > 1 ? nameLen - 1 : nameLen;
+        
+        if (attempt < nameAttempts) {
+            return QString(name[0]) + QString(name[attempt + 1]);
+        }
+        
+        // 第二阶段: 名字组合都用完了, 使用任意字符尝试
+        // 使用 a-z 字符的所有两字符组合
+        int adjustedAttempt = attempt - nameAttempts;
+        const QString chars = "abcdefghijklmnopqrstuvwxyz";
+        int charsCount = chars.length();
+        
+        int pos1 = (adjustedAttempt / charsCount) % charsCount;
+        int pos2 = adjustedAttempt % charsCount;
+        
+        return QString(chars[pos1]) + QString(chars[pos2]);
+    }
+
+private:
+    QMap<QString, QString> m_nameToCode;  //!< pageName -> shortcode
+    QMap<QString, QString> m_codeToName;  //!< shortcode -> pageName
+};
+
 // 前置声明
 class PagesManager;
 class PagesContainer;
@@ -49,6 +187,9 @@ public:
     //! @brief 返回页面名称
     //! @note 页面名称在同一层级中应该唯一, 且不能为空.
     QString name() const { return m_name; }
+
+    //! @brief 返回页面的唯一短码
+    QString code() const { return m_shortcode; }
 
     //! @brief 返回页面路径
     //! @note 大小写不敏感, 页面路径应该唯一, 且不能为空.
@@ -139,6 +280,7 @@ public:
 
 protected:
     QString m_name;                     //!< 页面名称
+    QString m_shortcode;                //!< 页面短码
     QVariantMap m_lastParams;           //!< 最近的页面入参
     PagesContainer* m_parent;           //!< 父容器
     QSet<PagesContainer*> m_containers; //!< 已安装的容器实例
@@ -163,10 +305,31 @@ public:
     //! @param name 页面名称, 在同一层级中应该唯一, 且不能为空.
     //! @param page 页面实例
     virtual void installPage(QString name, AbstractPage* page) {
+        installPageWithCode(name, {}, page);
+    }
+
+    //! @brief 安装页面到页面容器中, 并指定页面的名称和短码
+    //! @param name 页面名称, 在同一层级中应该唯一, 且不能为空.
+    //! @param shortcode 页面短码(2字符), 如果为空则自动分配
+    //! @param page 页面实例
+    //! @note 如果短码冲突，将以致命错误结束
+    virtual void installPageWithCode(QString name, QString shortcode, AbstractPage* page) {
         name = name.toLower();
         Q_ASSERT(!m_names.contains(name));
+        
+        // 分配或验证短码
+        ShortcodeAllocator& allocator = ShortcodeAllocator::instance();
+        QString assignedCode = allocator.assignShortcode(name, shortcode);
+        
+        if (assignedCode.isEmpty()) {
+            Q_ASSERT_X(false, "PagesContainer::installPageWithCode", 
+                       QString("Shortcode collision: %1").arg(shortcode).toStdString().c_str());
+            return;
+        }
+        
         m_names[name] = QStackedWidget::addWidget(page);
         page->m_name = name;
+        page->m_shortcode = assignedCode;
         page->m_parent = this;
     }
 
@@ -392,6 +555,54 @@ public:
     //! @return 调用结果, 由页面的 pageInvoke() 事件返回。
     QVariant pageInvoke(QString callerPagePath, QString calleePagePath, const QVariantMap& params) {
         return page(calleePagePath)->pageInvoke(callerPagePath.toLower(), params);
+    }
+
+    //! @brief 将正常页面路径转换为短码路径
+    //! @param normalPath 正常页面路径, 格式: /page1/page2/page3
+    //! @return 短码路径, 格式: p1p2p3 (每个页面的短码连接, 无分隔符)
+    QString toShortcodePath(QString normalPath) const {
+        if (normalPath.isEmpty())
+            return {};
+        
+        // 移除首尾的 /
+        normalPath = normalPath.toLower();
+        if (normalPath.startsWith("/"))
+            normalPath = normalPath.mid(1);
+        if (normalPath.endsWith("/"))
+            normalPath = normalPath.left(normalPath.length() - 1);
+        
+        QStringList hops = normalPath.split("/", Qt::SkipEmptyParts);
+        QString result;
+        
+        for (const auto& hop : hops) {
+            result += ShortcodeAllocator::instance().pageCode(hop);;
+        }
+        
+        return result;
+    }
+
+    //! @brief 将短码路径转换为正常页面路径
+    //! @param shortcodePath 短码路径, 格式: p1p2p3 (每个短码为2字符)
+    //! @return 正常页面路径, 格式: /page1/page2/page3, 转换失败返回空字符串
+    QString fromShortcodePath(const QString& shortcodePath) const {
+        if (shortcodePath.isEmpty() || shortcodePath.length() % 2 != 0)
+            return {};
+        
+        QStringList hops;
+        ShortcodeAllocator& allocator = ShortcodeAllocator::instance();
+        
+        // 按2字符一组分割并转换
+        for (int i = 0; i < shortcodePath.length(); i += 2) {
+            QString code = shortcodePath.mid(i, 2);
+            QString name = allocator.pageName(code);
+            
+            if (name.isEmpty())
+                return {};  // 短码不存在
+            
+            hops.append(name);
+        }
+        
+        return "/" + hops.join("/");
     }
 
 public:
